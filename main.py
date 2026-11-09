@@ -1,95 +1,147 @@
+#########################################################
+# Square Number X V2.0.0
+#########################################################
 from random import randint as rint
-from typing import List
+from typing import Callable, Final
 
-VERSION="1.4.2"
+SEPARATOR = "_______________________________"
 
-run=True
+# public command groups (main.py may use them)
+MODE_PROCEDURAL: Final = (
+  'p', 'pro', 'proced', 'procedural')
+MODE_RANDOM: Final = (
+  'r', 'ran', 'rand', 'random', 'rng')
+MODE_REVERSE: Final = ('e', 'rev', 'reverse')
+MODE_REMEMBER: Final = (
+  'qr', 'rem', 'remem', 'remember')
 
-#TODO: Add language support
-m_proc:List[str]=['p','pro','proced','procedural']
-m_rand:List[str]=['r','ran','rand','random','rng']
-m_reve:List[str]=['e','rev','reverse']
-m_reme:List[str]=['qr','rem','remem','remember']
+TRUE_CMDS: Final = (
+  't', 'true', '1', 'y', 'yes', 'yeah',
+  'ye', 'sure')
+EXIT_CMDS: Final = (
+  'q', '^c', 'exit', 'break', 'ctrl+c',
+  'escape', 'ctrlc')
+MENU_CMDS: Final = (
+  'menu', 'configuration', 'home', 'm')
+ERROR_CMDS: Final = ('er', 'error', 'mistake')
 
-m_true:List[str]=['t','true','1','y','yes','yeah','ye','sure']
 
-m_exit:List[str]=['q','^c','exit','break','ctrl+c','escape','ctrlc']
-m_menu:List[str]=['menu','configuration','home','m']
-m_errr:List[str]=['er','error','mistake']
+class ExitRequested(Exception):
+  """User typed an exit command."""
 
-dline:str='_______________________________'
 
-mistakes:int=0
-
-def chek(s:str,array:List[str])->bool:#CHEcK
-  """
-  Return True if `s` is a member of `array`, otherwise False
-  Example: You can say in prompt yeah, yes, ye, true instead of yes
-  """
-  return s in array
-
-def chex(text:str)->str:#CHeck EXit
-  """
-  Return `text`, or exit the program if it is an exit command
-  """
-  if chek(text,m_exit):exit()
+def ask(
+  prompt: str,
+  input_fn: Callable[[str], str] = input,
+) -> str:
+  """Read input. Raise ExitRequested on an exit cmd."""
+  text = input_fn(prompt)
+  if text.lower() in EXIT_CMDS:
+    raise ExitRequested
   return text
 
-def is_n(text:str)->int:#IS Number
-  """
-  Parse `text` as an integer, falling back to 11 when it is not numeric
-  """
-  return int(text) if text.isnumeric() else 11
 
-print(f'\nSquare Number X | Version: {VERSION}\n{dline}\n')
+def parse_int(
+  """Parse text as int, or return default.
+  Accepts sign and whitespace (e.g. '-5', '+5')."""
+  text: str, default: int = 11) -> int:
+  try: return int(text)
+  except ValueError: return default
 
-while True:
-  minimal=is_n(chex(input('Enter minimum: ')))
-  maximal=is_n(chex(input('Enter maximum: ')))
 
-  mode=chex(input('\nProcedural | Random | Reverse | Remember\nMode: ')).lower()
-  if chek(mode,m_rand):skip_number_with_zero=chex(input('\nSkip numbers that ends at 0\nEnable: '));error_fix=False
-  elif not chek(mode,m_reme):error_fix=chex(input('\nError corrector\nEnable: ')).lower()
-  else:error_fix=False
+def next_number(
+  mode: str, prev: int, lo: int, hi: int,
+  skip_zero: bool = False) -> int:
+  """Return the next number to quiz on.
+  Pure, no I/O, no state."""
+  if mode in MODE_RANDOM:
+    if skip_zero:
+      pool = [
+        n for n in range(lo, hi + 1)
+        if n % 10 != 0]
+      if pool:
+        return pool[rint(0, len(pool) - 1)]
+    return rint(lo, hi)
+  if mode in MODE_REVERSE:
+    return prev - 1 if prev > lo else hi
+  return prev + 1 if prev < hi else lo
 
-  print(dline+'\n')
 
-  prevnumber=minimal-1
+def run_session(
+  lo: int, hi: int, mode: str, *,
+  error_fix: bool = False,
+  skip_zero: bool = False,
+  input_fn: Callable[[str], str] = input,
+  output_fn: Callable[[str], None] = print,
+) -> int:
+  """Run one quiz session. Return mistake count."""
+  mistakes, prev = 0, lo - 1
+  while True:
+    number = next_number(
+      mode, prev, lo, hi, skip_zero)
+    prev = number
+    correct = number ** 2
+    answer = ask(
+      f"{number}x{number}: ",
+      input_fn).lower()
 
-  if chek(mode,m_reme):
-    while prevnumber<=maximal-1:
-      prevnumber+=1
-      number=prevnumber
+    if answer == str(correct):
+      output_fn("[+] Correct.")
+    elif answer in MENU_CMDS:
+      output_fn("[*] Mode changed")
+      break
+    elif answer in ERROR_CMDS:
+      output_fn(f"[*] Mistakes: {mistakes}")
+    else:
+      mistakes += 1
+      output_fn(
+        f"[-] Wrong. Right answer is {correct}")
+      if error_fix:
+        prev = lo - 1
+  return mistakes
 
-      print(str(number)+'x'+str(number)+': '+str(number**2))
-  else:
-    while run:
-        if chek(mode,m_rand):
-          number=rint(minimal,maximal)
-        elif chek(mode,m_reve):
-          if prevnumber<=minimal:
-            prevnumber=maximal+1
-          prevnumber-=1
-          number=prevnumber
-        else:
-          if prevnumber>=maximal:
-            prevnumber=minimal-1
-          prevnumber+=1
-          number=prevnumber
 
-        correct=number**2
-        answer=chex(input(str(number)+'x'+str(number)+': '))
-        if answer==str(correct):print(' [+] Correct.')
-        elif chek(answer,m_menu):
-          print(' [*] Mode changed\n')
-          break
-        elif chek(answer,m_errr):
-          print(f' [*] Mistakes: {mistakes}')
-          prevnumber=number-1#IDK
-        else:
-          mistakes+=1
-          print(' [-] Wrong. Right answer is '+str(correct))
-          if chek(error_fix,m_true):
-            prevnumber=minimal-1
+# standalone entry point
+# (what runs on a restricted system)
+def main() -> None:
+  """Minimal CLI. Runs anywhere Python 3.8+."""
+  print("\nSquare Number X\n")
+  while True:
+    lo = parse_int(ask("Enter minimum: "))
+    hi = parse_int(ask("Enter maximum: "))
+    if lo > hi:
+      lo, hi = hi, lo
 
-        print(dline+'\n')
+    mode = ask(
+      "\nProcedural | Random | Reverse"
+      " | Remember\nMode: ").lower()
+    skip_zero = error_fix = False
+
+    if mode in MODE_RANDOM:
+      skip_zero = ask(
+        "\nSkip multiples of 10\nEnable: "
+      ).lower() in TRUE_CMDS
+    elif mode not in MODE_REMEMBER:
+      error_fix = ask(
+        "\nError corrector\nEnable: "
+      ).lower() in TRUE_CMDS
+
+    print(SEPARATOR + "\n")
+
+    if mode in MODE_REMEMBER:
+      for n in range(lo, hi + 1):
+        print(f"{n}x{n}: {n ** 2}")
+      continue
+
+    run_session(
+      lo, hi, mode, error_fix=error_fix,
+      skip_zero=skip_zero)
+    print(SEPARATOR + "\n")
+
+
+if __name__ == '__main__':
+  try:
+    main()
+  except (KeyboardInterrupt, EOFError,
+          ExitRequested):
+    print("\n^c executed.")
